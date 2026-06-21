@@ -201,7 +201,7 @@ export default function Sidebar({
           <div className="flex items-center gap-2.5 px-1.5">
             <LogoMark />
             <span className="font-display text-lg font-semibold tracking-tight text-ink">
-              TaskMaster Pro
+              Asikaso
             </span>
           </div>
           <button
