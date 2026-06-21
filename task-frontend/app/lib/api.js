@@ -11,7 +11,7 @@ async function parseErrorMessage(res, fallback) {
   } catch {
     // Response wasn't JSON at all (e.g. the API crashed before sending JSON,
     // or a proxy/server returned an HTML error page) — this is the
-    // "unexpected error" case the assessment asks us to handle gracefully.
+    // "unexpected error" that we need to handle gracefully.
     return { message: fallback };
   }
 }
