@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 /**
  * Generic confirmation modal for destructive actions (delete task, delete
  * category, delete-with-reassign). Kept separate from ToastProvider because
@@ -16,13 +18,22 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }) {
+  // Lock page scroll behind the modal while it's open.
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 backdrop-blur-[2px] px-4"
-      onClick={onCancel}
-    >
+    // Backdrop click no longer dismisses the dialog — only the explicit
+    // Confirm/Cancel buttons can, so an accidental click outside doesn't
+    // silently cancel a delete the user actually meant to confirm.
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 backdrop-blur-[2px] px-4">
       <div
         className="w-full max-w-sm bg-surface rounded-2xl border border-border shadow-[0_12px_32px_rgba(17,21,28,0.18)] p-5 animate-[feedback-in_0.18s_ease-out]"
         onClick={(e) => e.stopPropagation()}
@@ -55,7 +66,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-xl bg-bg border border-border text-ink text-sm font-medium px-4 py-2.5 hover:bg-border/40 transition-colors disabled:opacity-50"
+            className="rounded-xl bg-bg border border-border text-ink text-sm font-medium px-4 py-2.5 hover:bg-border/40 transition-colors"
           >
             {cancelLabel}
           </button>
