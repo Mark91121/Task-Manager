@@ -30,14 +30,8 @@ export default function TaskItem({ task, onToggle, onDelete, onRequestEdit }) {
     }
   }
 
-  async function handleDelete() {
-    setBusy(true);
-    try {
-      await onDelete(task.id);
-    } catch (err) {
-      setError(err.message || "Failed to delete task.");
-      setBusy(false);
-    }
+  function handleDelete() {
+    onDelete(task.id);
   }
 
   const dueLabel = formatDueDate(task.dueDate);
