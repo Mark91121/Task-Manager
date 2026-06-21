@@ -65,9 +65,6 @@ async function createTask(req, res) {
 }
 
 // PUT /tasks/:id
-// Also stamps/clears `completedAt` whenever `completed` flips, so the
-// dashboard can answer "how many tasks were completed today / this week"
-// without inferring it from updatedAt (which changes on every edit).
 async function updateTask(req, res) {
   try {
     const { id } = req.params;
@@ -147,35 +144,123 @@ async function deleteTask(req, res) {
   }
 }
 
-// GET /tasks/analytics
+// Builds the trend chart's date buckets for a given window, at the right
+// granularity (day/week/month), then counts created/completed tasks that
+// fall into each bucket. Keeping this separate from getAnalytics so the
+// range-to-bucket logic stays easy to read.
+function buildTrend(rawTasks, start, end, bucketUnit) {
+  const buckets = [];
+
+  if (bucketUnit === "day") {
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const bucketStart = new Date(cursor);
+      const bucketEnd = new Date(bucketStart.getTime() + 86400000);
+      buckets.push({ label: bucketStart, start: bucketStart, end: bucketEnd });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  } else if (bucketUnit === "week") {
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const bucketStart = new Date(cursor);
+      const bucketEnd = new Date(bucketStart.getTime() + 7 * 86400000);
+      buckets.push({ label: bucketStart, start: bucketStart, end: bucketEnd });
+      cursor.setDate(cursor.getDate() + 7);
+    }
+  } else {
+    // month
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cursor <= endMonth) {
+      const bucketStart = new Date(cursor);
+      const bucketEnd = new Date(
+        cursor.getFullYear(),
+        cursor.getMonth() + 1,
+        1,
+      );
+      buckets.push({ label: bucketStart, start: bucketStart, end: bucketEnd });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  return buckets.map((b) => ({
+    date: b.label.toISOString().slice(0, 10),
+    created: rawTasks.filter(
+      (t) => t.createdAt >= b.start && t.createdAt < b.end,
+    ).length,
+    completed: rawTasks.filter(
+      (t) => t.completedAt && t.completedAt >= b.start && t.completedAt < b.end,
+    ).length,
+  }));
+}
+
+// GET /tasks/analytics?range=7d|30d|90d|year|all
 //
-// Single aggregated payload for the dashboard so the frontend doesn't have
-// to fetch all tasks and crunch numbers client-side. Runs everything in one
-// Promise.all batch to keep the round trip fast.
+// Current-state stats (active/overdue/total/etc.) are always a live
+// snapshot regardless of `range` — that's "what's true right now", not a
+// historical window. `range` only controls the trend chart's window and
+// bucket granularity, which is the one part of the dashboard that's
+// genuinely about "over time".
 async function getAnalytics(req, res) {
   try {
+    const range = ["7d", "30d", "90d", "year", "all"].includes(req.query.range)
+      ? req.query.range
+      : "7d";
+
     const now = new Date();
     const startOfToday = new Date(
       now.getFullYear(),
       now.getMonth(),
       now.getDate(),
     );
+    const endOfToday = new Date(startOfToday.getTime() + 86400000);
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    const sevenDaysAgo = new Date(startOfToday);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+    let trendStart;
+    let bucketUnit;
+
+    if (range === "30d") {
+      trendStart = new Date(startOfToday);
+      trendStart.setDate(trendStart.getDate() - 29);
+      bucketUnit = "day";
+    } else if (range === "90d") {
+      trendStart = new Date(startOfToday);
+      trendStart.setDate(trendStart.getDate() - 89);
+      bucketUnit = "week";
+    } else if (range === "year") {
+      trendStart = new Date(now.getFullYear(), 0, 1);
+      bucketUnit = "month";
+    } else if (range === "all") {
+      const earliest = await prisma.task.findFirst({
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      });
+      trendStart = earliest
+        ? new Date(
+            earliest.createdAt.getFullYear(),
+            earliest.createdAt.getMonth(),
+            1,
+          )
+        : startOfToday;
+      bucketUnit = "month";
+    } else {
+      trendStart = new Date(startOfToday);
+      trendStart.setDate(trendStart.getDate() - 6);
+      bucketUnit = "day";
+    }
 
     const [
       total,
       completed,
       active,
       overdue,
-      dueToday,
+      dueTodayTasks,
       completedToday,
       completedThisWeek,
       byCategoryRaw,
       recentTasks,
-      last7DaysRaw,
+      trendRangeRaw,
     ] = await Promise.all([
       prisma.task.count(),
       prisma.task.count({ where: { completed: true } }),
@@ -183,14 +268,15 @@ async function getAnalytics(req, res) {
       prisma.task.count({
         where: { completed: false, dueDate: { lt: startOfToday } },
       }),
-      prisma.task.count({
+      // Full task list due today, not just a count — lets the dashboard
+      // show what those tasks actually are, not just how many.
+      prisma.task.findMany({
         where: {
           completed: false,
-          dueDate: {
-            gte: startOfToday,
-            lt: new Date(startOfToday.getTime() + 86400000),
-          },
+          dueDate: { gte: startOfToday, lt: endOfToday },
         },
+        select: { id: true, title: true },
+        orderBy: { createdAt: "asc" },
       }),
       prisma.task.count({ where: { completedAt: { gte: startOfToday } } }),
       prisma.task.count({ where: { completedAt: { gte: startOfWeek } } }),
@@ -209,7 +295,7 @@ async function getAnalytics(req, res) {
         include: { category: true },
       }),
       prisma.task.findMany({
-        where: { createdAt: { gte: sevenDaysAgo } },
+        where: { createdAt: { gte: trendStart } },
         select: { createdAt: true, completedAt: true },
       }),
     ]);
@@ -222,37 +308,19 @@ async function getAnalytics(req, res) {
       completed: c.tasks.filter((t) => t.completed).length,
     }));
 
-    // Build a 7-day trend of created vs completed counts, oldest -> newest,
-    // for a simple bar/line chart on the dashboard.
-    const trend = [];
-    for (let i = 6; i >= 0; i -= 1) {
-      const dayStart = new Date(startOfToday);
-      dayStart.setDate(dayStart.getDate() - i);
-      const dayEnd = new Date(dayStart.getTime() + 86400000);
-
-      trend.push({
-        date: dayStart.toISOString().slice(0, 10),
-        created: last7DaysRaw.filter(
-          (t) => t.createdAt >= dayStart && t.createdAt < dayEnd,
-        ).length,
-        completed: last7DaysRaw.filter(
-          (t) =>
-            t.completedAt &&
-            t.completedAt >= dayStart &&
-            t.completedAt < dayEnd,
-        ).length,
-      });
-    }
+    const trend = buildTrend(trendRangeRaw, trendStart, now, bucketUnit);
 
     res.json({
+      range,
       totals: {
         total,
         completed,
         active,
         overdue,
-        dueToday,
+        dueToday: dueTodayTasks.length,
         completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
       },
+      dueTodayTasks,
       completedToday,
       completedThisWeek,
       byCategory,
