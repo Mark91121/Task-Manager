@@ -261,51 +261,72 @@ function HomeContent() {
       />
 
       <main className="flex-1 min-h-screen min-w-0">
-        <MobileTopbar
-          onOpenMenu={() => setMobileMenuOpen(true)}
-          heading={heading}
-        />
+        {/* Sticky header zone: mobile topbar + page title/actions + the
+            search/filter bar all stay pinned to the top of the content
+            area while the task list scrolls underneath, so search and
+            filters stay reachable without scrolling back up. */}
+        <div className="sticky top-0 z-30 bg-bg border-b border-border">
+          <MobileTopbar
+            onOpenMenu={() => setMobileMenuOpen(true)}
+            heading={heading}
+          />
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-12">
-          <header className="flex flex-wrap items-center justify-between gap-3 mb-6 sm:mb-7">
-            <div className="min-w-0">
-              <h1 className="font-display text-xl sm:text-2xl lg:text-[1.7rem] font-semibold tracking-tight text-ink leading-tight truncate">
-                {heading}
-              </h1>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 sm:pb-5">
+            <header className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="font-display text-xl sm:text-2xl lg:text-[1.7rem] font-semibold tracking-tight text-ink leading-tight truncate">
+                  {heading}
+                </h1>
+                {view === "tasks" && (
+                  <p className="text-xs font-mono text-muted mt-0.5 tracking-wide">
+                    {loading
+                      ? "syncing…"
+                      : `${activeCount} active · ${tasks.length} total`}
+                  </p>
+                )}
+              </div>
+
               {view === "tasks" && (
-                <p className="text-xs font-mono text-muted mt-0.5 tracking-wide">
-                  {loading
-                    ? "syncing…"
-                    : `${activeCount} active · ${tasks.length} total`}
-                </p>
+                <button
+                  type="button"
+                  onClick={openCreateForm}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 sm:px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors shadow-[0_1px_2px_rgba(79,110,247,0.3)]"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 5v14M5 12h14"
+                    />
+                  </svg>
+                  <span className="hidden xs:inline">Add New Task</span>
+                  <span className="xs:hidden">Add</span>
+                </button>
               )}
-            </div>
+            </header>
 
             {view === "tasks" && (
-              <button
-                type="button"
-                onClick={openCreateForm}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 sm:px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover transition-colors shadow-[0_1px_2px_rgba(79,110,247,0.3)]"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 5v14M5 12h14"
-                  />
-                </svg>
-                <span className="hidden xs:inline">Add New Task</span>
-                <span className="xs:hidden">Add</span>
-              </button>
+              <div className="mt-4 sm:mt-5">
+                <SearchFilterBar
+                  search={search}
+                  onSearchChange={setSearch}
+                  filter={filter}
+                  onFilterChange={setFilter}
+                />
+              </div>
             )}
-          </header>
+          </div>
+        </div>
 
+        {/* Scrollable content zone — only this part moves under the sticky
+            header above. */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-7 pb-6 sm:pb-10 lg:pb-12">
           {view === "dashboard" ? (
             <Dashboard
               onNavigateToTasks={() => {
@@ -315,13 +336,6 @@ function HomeContent() {
             />
           ) : (
             <div className="space-y-6">
-              <SearchFilterBar
-                search={search}
-                onSearchChange={setSearch}
-                filter={filter}
-                onFilterChange={setFilter}
-              />
-
               {error && (
                 <p className="text-sm text-danger bg-danger-soft rounded-xl px-3.5 py-2.5">
                   {error}
