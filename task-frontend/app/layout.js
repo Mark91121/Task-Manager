@@ -20,7 +20,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata = {
-  title: "TaskMaster Pro",
+  title: "Asikaso",
   description: "An organized space to manage your tasks by category.",
 };
 
