@@ -1,4 +1,4 @@
-// Prisma schema for TaskMaster Pro
+// Prisma schema for Asikaso
 // Database: Supabase (PostgreSQL)
 //
 // Supabase gives you two connection strings:
@@ -8,7 +8,8 @@
 
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  previewFeatures = ["drivenpx prisma generate
+npm run devrAdapters"]
 }
 
 datasource db {
