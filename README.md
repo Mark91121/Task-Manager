@@ -1,6 +1,6 @@
 # Asikaso — Task Management App
 
-A fullstack task management application that lets users create, organize, search, and track tasks by category, with a live analytics dashboard. Built as a practical fullstack assessment submission.
+A fullstack task management application that lets users create, organize, search, and track tasks by category, with a live analytics dashboard.
 
 **Repo:** [github.com/Mark91121/Task-Manager](https://github.com/Mark91121/Task-Manager)
 **Stack:** Next.js (`task-frontend`) · Express / Node.js (`task-api`) · Supabase (PostgreSQL database) · Prisma (ORM)
