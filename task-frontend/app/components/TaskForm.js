@@ -11,9 +11,6 @@ function buildEmptyForm(defaultCategoryId) {
   };
 }
 
-// Returns today's date as "YYYY-MM-DD" using local time (not UTC), so the
-// comparison matches what the user actually sees in the date picker
-// regardless of timezone.
 function getTodayString() {
   const now = new Date();
   const year = now.getFullYear();
@@ -28,9 +25,6 @@ export default function TaskForm({
   onSubmit,
   categories,
   initialTask,
-  // Category the user is currently viewing in the sidebar (e.g. "Home").
-  // When creating a brand-new task, the form should default to this category
-  // instead of forcing the user to re-pick it every time.
   defaultCategoryId,
 }) {
   const [form, setForm] = useState(() => buildEmptyForm(defaultCategoryId));
@@ -55,10 +49,29 @@ export default function TaskForm({
     setError("");
   }, [open, initialTask, defaultCategoryId]);
 
+  // Lock page scroll behind the modal while it's open, restore it on close.
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   if (!open) return null;
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handleDueDateChange(value) {
+    if (value && value < todayString) {
+      update("dueDate", todayString);
+      setError("Due date cannot be before today — reset to today's date.");
+      return;
+    }
+    setError("");
+    update("dueDate", value);
   }
 
   async function handleSubmit(e) {
@@ -69,9 +82,6 @@ export default function TaskForm({
       return;
     }
 
-    // Backup check in case a past date gets in some other way than the
-    // picker (e.g. typed directly) — the `min` attribute on the input
-    // handles the picker itself, this catches anything that slips past it.
     if (form.dueDate && form.dueDate < todayString) {
       setError("Due date cannot be in the past.");
       return;
@@ -95,10 +105,7 @@ export default function TaskForm({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-ink/40 backdrop-blur-[2px] px-4 py-8 overflow-y-auto"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-ink/40 backdrop-blur-[2px] px-4 py-8 overflow-y-auto">
       <div
         className="w-full max-w-md bg-surface rounded-2xl border border-border shadow-[0_12px_32px_rgba(17,21,28,0.18)] p-5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
@@ -180,7 +187,7 @@ export default function TaskForm({
                 type="date"
                 value={form.dueDate}
                 min={todayString}
-                onChange={(e) => update("dueDate", e.target.value)}
+                onChange={(e) => handleDueDateChange(e.target.value)}
                 className="w-full rounded-xl border border-border bg-bg/40 px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-shadow"
               />
             </div>
