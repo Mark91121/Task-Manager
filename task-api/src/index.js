@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("TaskMaster Pro API is running");
+  res.send("Asikaso API is running");
 });
 
 app.use("/tasks", tasksRouter);
